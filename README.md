@@ -50,6 +50,14 @@ This plugin `netlify-plugin-cypress` by default runs during the "onSuccess" even
 
 Optionally, you can also run tests during "preBuild" and "postBuild" steps. This is useful if you want to ensure the site is working even before deploying it to Netlify servers. Finally, this plugin does not use "onFailure" event which happens only if Netlify fails to deploy the site.
 
+### Failing the deploy
+
+Running Cypress tests by default uses the "onSuccess" step of the build pipeline. By this point Netlify has already deployed the site. Even if the tests fail now, the Netlify shows the successful deployment - the site is live! To really prevent the broken deploys, we suggest using [Cypress GitHub / GitLab / Bitbucket integration](https://on.cypress.io/github-integration) to fail the _status checks_ on a pull request.
+
+We also suggest running tests during the "preBuild" and/or "postBuild" steps. If the tests fail during these steps, the Netlify fails the entire build and does not deploy the broken site.
+
+Finally, you can set up [Slack notifications](https://on.cypress.io/slack-integration) on failed tests against the deployed site. At least you will quickly find out if the deployed site fails the E2E tests and would be able to roll back the deploy.
+
 ## Examples
 
 ### basic
@@ -214,6 +222,27 @@ package = "netlify-plugin-cypress"
   browser = "electron"
 ```
 
+### configFile
+
+If you would like to use a different Cypress config file instead of `cypress.json`, specify it using the `configFile` option
+
+```toml
+[build]
+command = "npm run build"
+publish = "build"
+  [build.environment]
+  # cache Cypress binary in local "node_modules" folder
+  # so Netlify caches it
+  CYPRESS_CACHE_FOLDER = "./node_modules/CypressBinary"
+  # set TERM variable for terminal output
+  TERM = "xterm"
+
+[[plugins]]
+package = "netlify-plugin-cypress"
+  [plugins.inputs]
+  configFile = "cypress.netlify.json"
+```
+
 ### testing SPA routes
 
 SPAs need catch-all redirect setup to make non-root paths accessible by tests. You can enable this with `spa` parameter.
@@ -239,6 +268,7 @@ By default this plugin tests static site _after deploy_. But maybe you want to r
   # let's run tests against development server
   # before building it (and testing the built site)
   [plugins.inputs.preBuild]
+    enable = true
     start = 'npm start'
     wait-on = 'http://localhost:5000'
     wait-on-timeout = '30' # seconds
@@ -250,7 +280,7 @@ See [netlify-plugin-prebuild-example](https://github.com/cypress-io/netlify-plug
 
 ### testing the site after build
 
-By default this plugin tests static site _after deploy_. But maybe you want to run end-to-end tests locally after building the static site. Cypress includes a local static server for this case. Here is a sample config file
+By default this plugin tests static site _after deploy_. But maybe you want to run end-to-end tests locally after building the static site. Cypress includes a local static server for this case but you can specify your own command if needed by using the `start` argument. Here is a sample config file
 
 ```toml
 [[plugins]]
@@ -260,7 +290,7 @@ By default this plugin tests static site _after deploy_. But maybe you want to r
     enable = true
 ```
 
-Parameters you can place into `postBuild` inputs: `spec`, `record`, `group`, `tag`, and `spa`.
+Parameters you can place into `postBuild` inputs: `spec`, `record`, `group`, `tag`, `start` and `spa`.
 
 #### The SPA parameter
 
@@ -276,6 +306,7 @@ If your site requires all unknown URLs to redirect back to the index page, use t
     # so that client-side routing can correctly route them
     # can be set to true or "index.html" (or similar fallback filename in the built folder)
     spa = true
+    start = 'npm start'
 ```
 
 See [the routing example](./tests/routing/netlify.toml).
